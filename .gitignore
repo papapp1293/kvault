@@ -1,0 +1,10 @@
+/target
+**/*.rs.bk
+*.log
+.env
+.env.local
+appendonly.aof
+dump.rdb
+.DS_Store
+.idea/
+*.swp

@@ -1,0 +1,24 @@
+# tmuxp workspace: kvault — Rust in-memory KV store + live leaderboard service
+# Install with: cp tmuxp/kvault.yaml ~/.tmuxp/kvault.yaml
+# Start with: work kvault   (or: tmuxp load kvault)
+session_name: kvault
+start_directory: ~/code/kvault
+windows:
+  - window_name: claude
+    panes:
+      - shell_command:
+          - echo "Claude Code — main agent. Run: claude"
+          - claude
+  - window_name: codex
+    panes:
+      - shell_command:
+          - echo "Codex — second agent. Run: codex"
+          - codex
+  - window_name: dev
+    panes:
+      - shell_command:
+          - echo "Dev servers. Run: cargo run -p kv-server  (and: cargo run -p leaderboard)"
+  - window_name: shell
+    panes:
+      - shell_command:
+          - git status -sb

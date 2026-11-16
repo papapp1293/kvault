@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/kv-core",
+    "crates/kv-server",
+    "crates/leaderboard",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+authors = ["Gyumin Park"]
+repository = "https://github.com/papapp1293/kvault"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = "0.8"
+tower-http = { version = "0.6", features = ["fs"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+criterion = "0.5"
+
+# Release profile tuned for the benchmark story: LTO + single codegen unit
+# trades slower builds for faster hot paths.
+[profile.release]
+lto = true
+codegen-units = 1

@@ -1,0 +1,16 @@
+[package]
+name = "kv-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "In-memory storage engine for kvault: data structures, expiry, persistence"
+
+[dependencies]
+
+[dev-dependencies]
+criterion.workspace = true
+
+[[bench]]
+name = "store_bench"
+harness = false
