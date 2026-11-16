@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>kvault — System Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Patrick+Hand&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #faf7f1;
+    --ink: #232323;
+    --ink-soft: #555;
+    --blue: #3b82c4;
+    --green: #2f9e44;
+    --orange: #e8590c;
+    --purple: #7048e8;
+    --red: #e03131;
+    --yellow: #f2c94c;
+    --card: #fffdf8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    background-image: radial-gradient(#e5ded0 1px, transparent 1px);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    line-height: 1.6;
+  }
+  header.hero {
+    text-align: center;
+    padding: 3.5rem 1rem 1.5rem;
+  }
+  header.hero h1 {
+    font-family: 'Caveat', cursive;
+    font-size: 4rem;
+    margin: 0;
+    line-height: 1;
+  }
+  header.hero p.sub {
+    font-family: 'Patrick Hand', cursive;
+    font-size: 1.3rem;
+    color: var(--ink-soft);
+    margin: 0.5rem 0 0;
+  }
+  header.hero p.note {
+    max-width: 640px;
+    margin: 1.25rem auto 0;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+  }
+  nav.toc {
+    max-width: 860px;
+    margin: 1.5rem auto 0;
+    padding: 0 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: center;
+  }
+  nav.toc a {
+    font-family: 'Patrick Hand', cursive;
+    color: var(--ink);
+    text-decoration: none;
+    border: 2px solid var(--ink);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 0.15rem 0.9rem;
+    background: var(--card);
+    font-size: 0.95rem;
+  }
+  nav.toc a:hover { background: var(--yellow); }
+  main { max-width: 860px; margin: 0 auto; padding: 1rem 1rem 4rem; }
+  section { margin-top: 3.5rem; }
+  h2 {
+    font-family: 'Caveat', cursive;
+    font-size: 2.2rem;
+    margin: 0 0 0.25rem;
+  }
+  h2 .num {
+    display: inline-block;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 50%;
+    width: 1.6rem; height: 1.6rem;
+    font-size: 1.1rem;
+    text-align: center;
+    line-height: 1.6rem;
+    margin-right: 0.4rem;
+    font-family: 'Patrick Hand', cursive;
+  }
+  .lede { color: var(--ink-soft); margin-top: 0; }
+  .diagram {
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    padding: 1rem;
+    margin: 1.25rem 0;
+    overflow-x: auto;
+  }
+  .diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+  .diagram .caption {
+    text-align: center;
+    font-family: 'Patrick Hand', cursive;
+    color: var(--ink-soft);
+    margin: 0.5rem 0 0;
+    font-size: 0.95rem;
+  }
+  .callout {
+    border-left: 4px solid var(--blue);
+    background: #eef5fc;
+    padding: 0.75rem 1rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1rem 0;
+  }
+  .callout.green { border-color: var(--green); background: #edf7ef; }
+  .callout.orange { border-color: var(--orange); background: #fdf1e7; }
+  .callout b { font-weight: 600; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #f0ebe0;
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    font-size: 0.88em;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.92rem; }
+  th { text-align: left; font-family: 'Patrick Hand', cursive; font-size: 1.05rem; border-bottom: 2px solid var(--ink); padding: 0.4rem 0.5rem; }
+  td { border-bottom: 1px dashed #d8d0bf; padding: 0.4rem 0.5rem; vertical-align: top; }
+  td:first-child { white-space: nowrap; }
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+  @media (max-width: 640px) { .cards { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 15px 225px 15px 255px / 255px 15px 225px 15px;
+    padding: 1rem 1.1rem;
+  }
+  .card h3 { font-family: 'Patrick Hand', cursive; margin: 0 0 0.3rem; font-size: 1.15rem; }
+  .card p { margin: 0.3rem 0; font-size: 0.92rem; }
+  .card .where { color: var(--ink-soft); font-size: 0.85rem; }
+  .tag {
+    display: inline-block;
+    font-family: 'Patrick Hand', cursive;
+    font-size: 0.8rem;
+    border: 1.5px solid var(--ink);
+    border-radius: 10px;
+    padding: 0 0.5rem;
+    margin-right: 0.3rem;
+  }
+  .tag.blue { background: #dbeafe; }
+  .tag.green { background: #dcf2e2; }
+  .tag.orange { background: #ffe8d6; }
+  .tag.purple { background: #e5dbfb; }
+  footer { text-align: center; color: var(--ink-soft); font-size: 0.85rem; padding: 2rem 1rem; font-family: 'Patrick Hand', cursive; }
+  .svg-label { font-family: 'Patrick Hand', cursive; fill: var(--ink); }
+  .svg-small { font-family: 'Patrick Hand', cursive; fill: var(--ink-soft); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <h1>kvault — System Design</h1>
+  <p class="sub">an in-memory key-value store in Rust + a live leaderboard on top</p>
+  <p class="note">The whole design on one page: every component, every command, and the ideas behind them — in plain language, with pictures. The matching written doc lives in the repo at <code>docs/system-design.md</code>.</p>
+</header>
+<nav class="toc">
+  <a href="#big-picture">Big picture</a>
+  <a href="#journey">A request's journey</a>
+  <a href="#store">Inside the store</a>
+  <a href="#skiplist">Skip lists</a>
+  <a href="#concurrency">Mutex &amp; threads</a>
+  <a href="#duplex">Full-duplex &amp; pub/sub</a>
+  <a href="#persistence">Persistence</a>
+  <a href="#leaderboard">Leaderboard</a>
+  <a href="#commands">All commands</a>
+  <a href="#rust">Rust primer</a>
+  <a href="#decisions">Open decisions</a>
+  <a href="#glossary">Glossary</a>
+</nav>
+<main>
+
+<section id="big-picture">
+  <h2><span class="num">1</span> The big picture</h2>
+  <p class="lede">Three crates, three jobs. The store knows nothing about sockets. The server knows nothing about storage. The leaderboard owns no state at all.</p>
+  <div class="diagram">
+  <svg width="760" height="340" viewBox="0 0 760 340" role="img" aria-label="System overview diagram">
+    <defs>
+      <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+    </defs>
+    <g filter="url(#rough)">
+      <rect x="20" y="30" width="170" height="60" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="20" y="120" width="170" height="60" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="20" y="230" width="170" height="60" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <rect x="270" y="60" width="200" height="110" rx="12" fill="#fff3bf" stroke="#232323" stroke-width="2"/>
+      <rect x="270" y="230" width="200" height="60" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <rect x="550" y="60" width="190" height="230" rx="12" fill="#ffe8d6" stroke="#232323" stroke-width="2"/>
+      <line x1="190" y1="60" x2="268" y2="90" stroke="#232323" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="190" y1="150" x2="268" y2="130" stroke="#232323" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="470" y1="115" x2="548" y2="130" stroke="#232323" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="190" y1="260" x2="268" y2="260" stroke="#232323" stroke-width="2" marker-end="url(#arrow)"/>
+      <line x1="470" y1="260" x2="548" y2="250" stroke="#232323" stroke-width="2" marker-end="url(#arrow)"/>
+    </g>
+    <g font-size="16">
+      <text x="105" y="56" text-anchor="middle" class="svg-label">redis-cli</text>
+      <text x="105" y="78" text-anchor="middle" class="svg-small" font-size="13">any Redis client</text>
+      <text x="105" y="146" text-anchor="middle" class="svg-label">redis-benchmark</text>
+      <text x="105" y="168" text-anchor="middle" class="svg-small" font-size="13">measures us vs Redis</text>
+      <text x="105" y="256" text-anchor="middle" class="svg-label">browser</text>
+      <text x="105" y="278" text-anchor="middle" class="svg-small" font-size="13">dashboard</text>
+      <text x="370" y="88" text-anchor="middle" class="svg-label">kv-server :6379</text>
+      <text x="370" y="112" text-anchor="middle" class="svg-small" font-size="13">accept loop · RESP parser</text>
+      <text x="370" y="132" text-anchor="middle" class="svg-small" font-size="13">command dispatch</text>
+      <text x="370" y="152" text-anchor="middle" class="svg-small" font-size="13">speaks Redis protocol</text>
+      <text x="370" y="256" text-anchor="middle" class="svg-label">leaderboard :3000</text>
+      <text x="370" y="278" text-anchor="middle" class="svg-small" font-size="13">score API · WebSocket · dashboard</text>
+      <text x="645" y="88" text-anchor="middle" class="svg-label">kv-core (the store)</text>
+      <text x="645" y="118" text-anchor="middle" class="svg-small" font-size="14">strings</text>
+      <text x="645" y="142" text-anchor="middle" class="svg-small" font-size="14">hashes</text>
+      <text x="645" y="166" text-anchor="middle" class="svg-small" font-size="14">sorted sets (skip list)</text>
+      <text x="645" y="190" text-anchor="middle" class="svg-small" font-size="14">expiry</text>
+      <text x="645" y="214" text-anchor="middle" class="svg-small" font-size="14">pub/sub</text>
+      <text x="645" y="238" text-anchor="middle" class="svg-small" font-size="14">AOF + snapshots</text>
+      <text x="645" y="268" text-anchor="middle" class="svg-small" font-size="13">no networking here</text>
+      <text x="228" y="72" text-anchor="middle" class="svg-small" font-size="12">RESP</text>
+      <text x="228" y="250" text-anchor="middle" class="svg-small" font-size="12">HTTP / WS</text>
+      <text x="508" y="105" text-anchor="middle" class="svg-small" font-size="12">calls</text>
+      <text x="508" y="240" text-anchor="middle" class="svg-small" font-size="12">calls</text>
+    </g>
+  </svg>
+  <p class="caption">The whole system. One box per crate, arrows show who talks to whom.</p>
+  </div>
+  <div class="callout green"><b>Why three crates?</b> So each part can be understood, tested, and changed alone. The store's tests never open a socket. The server's tests never touch a skip list. When something breaks, you know which box to open.</div>
+</section>
+
+<section id="journey">
+  <h2><span class="num">2</span> A request's journey</h2>
+  <p class="lede">What happens, step by step, when a client sends <code>SET score:sam 100</code>.</p>
+  <div class="diagram">
+  <svg width="760" height="180" viewBox="0 0 760 180" role="img" aria-label="Request journey diagram">
+    <defs>
+      <filter id="rough2"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow2" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+    </defs>
+    <g filter="url(#rough2)">
+      <rect x="10" y="55" width="110" height="70" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="160" y="55" width="110" height="70" rx="12" fill="#fff3bf" stroke="#232323" stroke-width="2"/>
+      <rect x="310" y="55" width="110" height="70" rx="12" fill="#fff3bf" stroke="#232323" stroke-width="2"/>
+      <rect x="460" y="55" width="110" height="70" rx="12" fill="#ffe8d6" stroke="#232323" stroke-width="2"/>
+      <rect x="610" y="55" width="110" height="70" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <line x1="120" y1="90" x2="158" y2="90" stroke="#232323" stroke-width="2" marker-end="url(#arrow2)"/>
+      <line x1="270" y1="90" x2="308" y2="90" stroke="#232323" stroke-width="2" marker-end="url(#arrow2)"/>
+      <line x1="420" y1="90" x2="458" y2="90" stroke="#232323" stroke-width="2" marker-end="url(#arrow2)"/>
+      <line x1="570" y1="90" x2="608" y2="90" stroke="#232323" stroke-width="2" marker-end="url(#arrow2)"/>
+      <path d="M 665 125 L 665 155 L 65 155 L 65 127" fill="none" stroke="#2f9e44" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrow2)"/>
+    </g>
+    <g font-size="15">
+      <text x="65" y="82" text-anchor="middle" class="svg-label">1. client</text>
+      <text x="65" y="104" text-anchor="middle" class="svg-small" font-size="12">sends bytes</text>
+      <text x="215" y="82" text-anchor="middle" class="svg-label">2. read</text>
+      <text x="215" y="104" text-anchor="middle" class="svg-small" font-size="12">bytes arrive,</text>
+      <text x="215" y="120" text-anchor="middle" class="svg-small" font-size="12">maybe split</text>
+      <text x="365" y="82" text-anchor="middle" class="svg-label">3. parse</text>
+      <text x="365" y="104" text-anchor="middle" class="svg-small" font-size="12">RESP → command</text>
+      <text x="515" y="82" text-anchor="middle" class="svg-label">4. execute</text>
+      <text x="515" y="104" text-anchor="middle" class="svg-small" font-size="12">store the value</text>
+      <text x="665" y="82" text-anchor="middle" class="svg-label">5. reply</text>
+      <text x="665" y="104" text-anchor="middle" class="svg-small" font-size="12">+OK back</text>
+      <text x="365" y="172" text-anchor="middle" class="svg-small" font-size="13">reply travels back the same connection</text>
+    </g>
+  </svg>
+  <p class="caption">One command, five steps. Steps 2–3 live in kv-server; step 4 lives in kv-core.</p>
+  </div>
+  <p>The tricky part is step 2: TCP delivers bytes in arbitrary chunks. A command might arrive in two pieces, or three commands might arrive in one piece. The parser handles both — it consumes complete frames and waits for more bytes when a frame is incomplete. That's the main thing task 001 teaches.</p>
+  <div class="callout"><b>Pipelining:</b> a client can send many commands without waiting for replies. The loop answers them in order. This is why Redis clients are fast — they batch.</div>
+</section>
+
+<section id="store">
+  <h2><span class="num">3</span> Inside the store</h2>
+  <p class="lede">One big map from keys to values — but a value can be three different shapes, and each shape exists for a reason.</p>
+  <div class="diagram">
+  <svg width="760" height="300" viewBox="0 0 760 300" role="img" aria-label="Store internals diagram">
+    <defs>
+      <filter id="rough3"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow3" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+    </defs>
+    <g filter="url(#rough3)">
+      <rect x="20" y="20" width="220" height="260" rx="12" fill="#fffdf8" stroke="#232323" stroke-width="2"/>
+      <rect x="300" y="20" width="200" height="70" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="300" y="115" width="200" height="70" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <rect x="300" y="210" width="200" height="70" rx="12" fill="#ffe8d6" stroke="#232323" stroke-width="2"/>
+      <rect x="560" y="115" width="180" height="70" rx="12" fill="#e5dbfb" stroke="#232323" stroke-width="2"/>
+      <line x1="240" y1="60" x2="298" y2="55" stroke="#232323" stroke-width="2" marker-end="url(#arrow3)"/>
+      <line x1="240" y1="150" x2="298" y2="150" stroke="#232323" stroke-width="2" marker-end="url(#arrow3)"/>
+      <line x1="240" y1="240" x2="298" y2="245" stroke="#232323" stroke-width="2" marker-end="url(#arrow3)"/>
+      <line x1="500" y1="150" x2="558" y2="150" stroke="#232323" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrow3)"/>
+    </g>
+    <g font-size="15">
+      <text x="130" y="48" text-anchor="middle" class="svg-label">the map</text>
+      <text x="130" y="70" text-anchor="middle" class="svg-small" font-size="13">HashMap&lt;key, Entry&gt;</text>
+      <text x="130" y="110" text-anchor="middle" class="svg-small" font-size="14">"score:sam" → …</text>
+      <text x="130" y="140" text-anchor="middle" class="svg-small" font-size="14">"player:sam" → …</text>
+      <text x="130" y="170" text-anchor="middle" class="svg-small" font-size="14">"board:1" → …</text>
+      <text x="130" y="205" text-anchor="middle" class="svg-small" font-size="13">each entry also has</text>
+      <text x="130" y="225" text-anchor="middle" class="svg-small" font-size="13">an optional expiry time</text>
+      <text x="130" y="255" text-anchor="middle" class="svg-small" font-size="13">past expiry = gone</text>
+      <text x="400" y="48" text-anchor="middle" class="svg-label">String</text>
+      <text x="400" y="70" text-anchor="middle" class="svg-small" font-size="13">plain bytes · SET / GET</text>
+      <text x="400" y="143" text-anchor="middle" class="svg-label">Hash</text>
+      <text x="400" y="165" text-anchor="middle" class="svg-small" font-size="13">field → value · HSET / HGET</text>
+      <text x="400" y="238" text-anchor="middle" class="svg-label">Sorted set</text>
+      <text x="400" y="260" text-anchor="middle" class="svg-small" font-size="13">member + score · ZADD / ZRANGE</text>
+      <text x="650" y="143" text-anchor="middle" class="svg-label">skip list</text>
+      <text x="650" y="165" text-anchor="middle" class="svg-small" font-size="13">keeps members sorted</text>
+      <text x="650" y="182" text-anchor="middle" class="svg-small" font-size="13">by score, O(log n)</text>
+    </g>
+  </svg>
+  <p class="caption">Keys point at entries. An entry is one of three shapes, plus an optional expiry.</p>
+  </div>
+  <div class="cards">
+    <div class="card"><h3>String <span class="tag blue">task 001</span></h3><p>The simplest shape: a key holds bytes. <code>SET</code> / <code>GET</code> / <code>DEL</code>, plus <code>INCR</code> for counters. Teaches the map itself.</p></div>
+    <div class="card"><h3>Hash <span class="tag green">task 002</span></h3><p>A key holds a mini-map of field → value. Player profiles, board metadata. Teaches the "one map, many value types" pattern.</p></div>
+    <div class="card"><h3>Sorted set <span class="tag orange">task 003</span></h3><p>Members with scores, kept in order. This is the leaderboard. Teaches skip lists — the most interview-relevant structure here.</p></div>
+    <div class="card"><h3>Expiry <span class="tag purple">task 004</span></h3><p>Every key can have a deadline. Lazy expiry on read + a background sweep for keys nobody touches. Seasonal boards are just expiring keys.</p></div>
+  </div>
+</section>
+
+<section id="skiplist">
+  <h2><span class="num">4</span> The skip list, zoomed in</h2>
+  <p class="lede">The leaderboard needs "top 10" and "what rank is Sam?" to be fast with millions of players. A sorted array is too slow to insert into; a balanced tree is hard to get right. The skip list is the middle path Redis chose.</p>
+  <div class="diagram">
+  <svg width="760" height="230" viewBox="0 0 760 230" role="img" aria-label="Skip list diagram">
+    <defs>
+      <filter id="rough4"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2"/></filter>
+      <marker id="arrow4" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+    </defs>
+    <g filter="url(#rough4)" stroke="#232323" stroke-width="2">
+      <line x1="60" y1="50" x2="700" y2="50" marker-end="url(#arrow4)"/>
+      <line x1="60" y1="110" x2="700" y2="110" marker-end="url(#arrow4)"/>
+      <line x1="60" y1="170" x2="700" y2="170" marker-end="url(#arrow4)"/>
+      <line x1="60" y1="50" x2="60" y2="170"/>
+      <line x1="220" y1="50" x2="220" y2="170"/>
+      <line x1="380" y1="110" x2="380" y2="170"/>
+      <line x1="540" y1="50" x2="540" y2="170"/>
+      <circle cx="60" cy="50" r="7" fill="#faf7f1"/><circle cx="60" cy="110" r="7" fill="#faf7f1"/><circle cx="60" cy="170" r="7" fill="#faf7f1"/>
+      <circle cx="220" cy="50" r="7" fill="#faf7f1"/><circle cx="220" cy="110" r="7" fill="#faf7f1"/><circle cx="220" cy="170" r="7" fill="#faf7f1"/>
+      <circle cx="380" cy="110" r="7" fill="#faf7f1"/><circle cx="380" cy="170" r="7" fill="#faf7f1"/>
+      <circle cx="540" cy="50" r="7" fill="#faf7f1"/><circle cx="540" cy="110" r="7" fill="#faf7f1"/><circle cx="540" cy="170" r="7" fill="#faf7f1"/>
+      <circle cx="700" cy="170" r="7" fill="#faf7f1"/>
+    </g>
+    <g font-size="14">
+      <text x="20" y="54" class="svg-label">L2</text>
+      <text x="20" y="114" class="svg-label">L1</text>
+      <text x="20" y="174" class="svg-label">L0</text>
+      <text x="60" y="205" text-anchor="middle" class="svg-label">head</text>
+      <text x="220" y="205" text-anchor="middle" class="svg-label">ana · 90</text>
+      <text x="380" y="205" text-anchor="middle" class="svg-label">sam · 120</text>
+      <text x="540" y="205" text-anchor="middle" class="svg-label">kim · 150</text>
+      <text x="700" y="205" text-anchor="middle" class="svg-label">zoe · 200</text>
+    </g>
+  </svg>
+  <p class="caption">Each level is a linked list. Higher levels skip further. To find a score, start at the top and drop down — like an express train that stops less often.</p>
+  </div>
+  <p>Searching starts at the top level and moves right while the next score is too small, then drops a level. Each level roughly halves the search, so finding anything takes about log(n) steps. Inserting picks a random height for the new node — that's the whole trick, and it's why the code stays simple while a balanced tree needs rotations.</p>
+  <div class="callout orange"><b>Paired with a hash map:</b> the skip list answers "who's ranked where." A plain map from member → score answers "what's Sam's score?" in O(1). Together they cover every sorted-set command.</div>
+</section>
+
+<section id="concurrency">
+  <h2><span class="num">5</span> Concurrency: what is a <code>Mutex&lt;HashMap&gt;</code>?</h2>
+  <p class="lede">The phrase that started this page. Here's the whole idea in one picture.</p>
+  <div class="diagram">
+  <svg width="760" height="260" viewBox="0 0 760 260" role="img" aria-label="Mutex diagram">
+    <defs>
+      <filter id="rough5"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow5" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+    </defs>
+    <g filter="url(#rough5)">
+      <rect x="30" y="30" width="150" height="50" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="30" y="110" width="150" height="50" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="30" y="190" width="150" height="50" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="300" y="85" width="160" height="90" rx="12" fill="#fff3bf" stroke="#232323" stroke-width="2"/>
+      <rect x="560" y="85" width="170" height="90" rx="12" fill="#ffe8d6" stroke="#232323" stroke-width="2"/>
+      <line x1="180" y1="55" x2="298" y2="110" stroke="#232323" stroke-width="2" marker-end="url(#arrow5)"/>
+      <line x1="180" y1="135" x2="298" y2="130" stroke="#2f9e44" stroke-width="2.5" marker-end="url(#arrow5)"/>
+      <line x1="180" y1="215" x2="298" y2="150" stroke="#232323" stroke-width="2" marker-end="url(#arrow5)"/>
+      <line x1="460" y1="130" x2="558" y2="130" stroke="#2f9e44" stroke-width="2.5" marker-end="url(#arrow5)"/>
+    </g>
+    <g font-size="15">
+      <text x="105" y="60" text-anchor="middle" class="svg-label">thread A</text>
+      <text x="105" y="140" text-anchor="middle" class="svg-label">thread B ✓ has it</text>
+      <text x="105" y="220" text-anchor="middle" class="svg-label">thread C</text>
+      <text x="380" y="118" text-anchor="middle" class="svg-label">the Mutex</text>
+      <text x="380" y="140" text-anchor="middle" class="svg-small" font-size="13">a lock — one holder</text>
+      <text x="380" y="158" text-anchor="middle" class="svg-small" font-size="13">at a time</text>
+      <text x="645" y="118" text-anchor="middle" class="svg-label">the HashMap</text>
+      <text x="645" y="140" text-anchor="middle" class="svg-small" font-size="13">the actual data,</text>
+      <text x="645" y="158" text-anchor="middle" class="svg-small" font-size="13">owned by the lock</text>
+      <text x="240" y="85" text-anchor="middle" class="svg-small" font-size="13">waits…</text>
+      <text x="240" y="195" text-anchor="middle" class="svg-small" font-size="13">waits…</text>
+    </g>
+  </svg>
+  <p class="caption">Three threads want the map. Only the one holding the lock touches it. The others wait.</p>
+  </div>
+  <p>A <code>Mutex&lt;HashMap&gt;</code> is a hash map with a lock wrapped around it. To use the map, a thread locks the mutex first; while one thread holds it, everyone else waits. Rust's twist: the mutex <em>owns</em> the map, so the compiler refuses to let you touch the data without holding the lock. Data races become compile errors instead of 3 AM production bugs.</p>
+  <div class="callout green"><b>But kvault barely needs it.</b> The store runs on a single-threaded event loop, like Redis: one thread owns the map outright, commands run one at a time, and nothing can race. Mutexes only appear at the edges — the pub/sub subscriber list, shared metrics — where data is genuinely shared between tasks. If you see a mutex in the code, ask: "which threads share this, and why?"</div>
+  <p><code>Arc</code> is the companion: a shared, reference-counted pointer that lets multiple threads own the same mutex. <code>Arc&lt;Mutex&lt;T&gt;&gt;</code> is Rust's standard "shared mutable state" idiom — you'll see it everywhere, and now you know what it says: <em>many owners, one at a time inside.</em></p>
+</section>
+
+<section id="duplex">
+  <h2><span class="num">6</span> Full-duplex &amp; pub/sub</h2>
+  <p class="lede">"Duplex" just means both directions at once. A TCP connection can carry requests one way and replies the other, simultaneously and independently.</p>
+  <div class="diagram">
+  <svg width="760" height="280" viewBox="0 0 760 280" role="img" aria-label="Full duplex and pubsub diagram">
+    <defs>
+      <filter id="rough6"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow6" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+      <marker id="arrow6g" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2f9e44"/></marker>
+    </defs>
+    <g filter="url(#rough6)">
+      <rect x="20" y="30" width="150" height="60" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="590" y="30" width="150" height="60" rx="12" fill="#fff3bf" stroke="#232323" stroke-width="2"/>
+      <line x1="170" y1="50" x2="588" y2="50" stroke="#232323" stroke-width="2" marker-end="url(#arrow6)"/>
+      <line x1="590" y1="70" x2="172" y2="70" stroke="#2f9e44" stroke-width="2" marker-end="url(#arrow6g)"/>
+      <rect x="20" y="150" width="150" height="60" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="270" y="150" width="200" height="60" rx="12" fill="#e5dbfb" stroke="#232323" stroke-width="2"/>
+      <rect x="590" y="130" width="150" height="50" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <rect x="590" y="200" width="150" height="50" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <line x1="170" y1="180" x2="268" y2="180" stroke="#232323" stroke-width="2" marker-end="url(#arrow6)"/>
+      <line x1="470" y1="170" x2="588" y2="155" stroke="#2f9e44" stroke-width="2" marker-end="url(#arrow6g)"/>
+      <line x1="470" y1="190" x2="588" y2="220" stroke="#2f9e44" stroke-width="2" marker-end="url(#arrow6g)"/>
+    </g>
+    <g font-size="15">
+      <text x="95" y="58" text-anchor="middle" class="svg-label">client</text>
+      <text x="95" y="78" text-anchor="middle" class="svg-small" font-size="12">redis-cli</text>
+      <text x="665" y="58" text-anchor="middle" class="svg-label">server</text>
+      <text x="380" y="42" text-anchor="middle" class="svg-small" font-size="13">requests →</text>
+      <text x="380" y="88" text-anchor="middle" class="svg-small" font-size="13">← replies (at the same time)</text>
+      <text x="380" y="118" text-anchor="middle" class="svg-label">one connection, two independent directions</text>
+      <text x="95" y="178" text-anchor="middle" class="svg-label">publisher</text>
+      <text x="95" y="198" text-anchor="middle" class="svg-small" font-size="12">PUBLISH board:1</text>
+      <text x="370" y="178" text-anchor="middle" class="svg-label">channel: board:1</text>
+      <text x="370" y="198" text-anchor="middle" class="svg-small" font-size="12">a list of subscribers</text>
+      <text x="665" y="158" text-anchor="middle" class="svg-label">subscriber 1</text>
+      <text x="665" y="228" text-anchor="middle" class="svg-label">subscriber 2</text>
+    </g>
+  </svg>
+  <p class="caption">Top: full-duplex — requests and replies flow independently. Bottom: pub/sub — one publish fans out to every subscriber.</p>
+  </div>
+  <p>Tokio expresses this by <strong>splitting</strong> a socket into a read half and a write half, each owned by different code. Most commands don't need the split — the loop reads, then writes, in order. Pub/sub is where it matters: a subscribed connection must receive messages at any moment, even while idle, so one task owns the read half (listening for <code>UNSUBSCRIBE</code>) while another owns the write half (pushing messages). That's also exactly how the leaderboard's live WebSocket works: score lands → publish → every watching dashboard gets pushed the update.</p>
+</section>
+
+<section id="persistence">
+  <h2><span class="num">7</span> Persistence: memory is fast and forgetful</h2>
+  <p class="lede">Everything so far lives in RAM. Restart the server and it's gone. Two mechanisms fix that, the same two Redis uses.</p>
+  <div class="diagram">
+  <svg width="760" height="260" viewBox="0 0 760 260" role="img" aria-label="Persistence diagram">
+    <defs>
+      <filter id="rough7"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow7" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+      <marker id="arrow7g" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2f9e44"/></marker>
+    </defs>
+    <g filter="url(#rough7)">
+      <rect x="280" y="20" width="200" height="60" rx="12" fill="#ffe8d6" stroke="#232323" stroke-width="2"/>
+      <rect x="40" y="140" width="220" height="80" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="500" y="140" width="220" height="80" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <line x1="340" y1="80" x2="170" y2="138" stroke="#232323" stroke-width="2" marker-end="url(#arrow7)"/>
+      <line x1="420" y1="80" x2="590" y2="138" stroke="#232323" stroke-width="2" marker-end="url(#arrow7)"/>
+      <path d="M 150 220 L 150 245 L 610 245 L 610 222" fill="none" stroke="#2f9e44" stroke-width="2" stroke-dasharray="5,4" marker-end="url(#arrow7g)"/>
+    </g>
+    <g font-size="15">
+      <text x="380" y="48" text-anchor="middle" class="svg-label">the store (RAM)</text>
+      <text x="380" y="68" text-anchor="middle" class="svg-small" font-size="13">fast · gone on restart</text>
+      <text x="150" y="168" text-anchor="middle" class="svg-label">AOF — the diary</text>
+      <text x="150" y="190" text-anchor="middle" class="svg-small" font-size="13">every write appended</text>
+      <text x="150" y="208" text-anchor="middle" class="svg-small" font-size="13">as it happens</text>
+      <text x="610" y="168" text-anchor="middle" class="svg-label">Snapshot — the photo</text>
+      <text x="610" y="190" text-anchor="middle" class="svg-small" font-size="13">whole store dumped</text>
+      <text x="610" y="208" text-anchor="middle" class="svg-small" font-size="13">to disk, now and then</text>
+      <text x="380" y="238" text-anchor="middle" class="svg-small" font-size="13">restart: load photo → replay diary → serve</text>
+    </g>
+  </svg>
+  <p class="caption">The diary records every change; the photo is a shortcut so restarts don't replay years of diary.</p>
+  </div>
+  <div class="callout"><b>The tradeoff:</b> writing the diary on every command is safest but costs a disk write per command. Redis's default is once a second — you might lose a second of writes in a crash, and that's usually fine. Which policy kvault uses is an open decision (§11 in the design doc).</div>
+</section>
+
+<section id="leaderboard">
+  <h2><span class="num">8</span> The leaderboard: the store, with a point</h2>
+  <p class="lede">The service owns no state — every read and write goes to the store. That constraint is what makes it a good demo of the store.</p>
+  <div class="diagram">
+  <svg width="760" height="300" viewBox="0 0 760 300" role="img" aria-label="Leaderboard flow diagram">
+    <defs>
+      <filter id="rough8"><feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="2" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="2.5"/></filter>
+      <marker id="arrow8" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#232323"/></marker>
+      <marker id="arrow8g" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#2f9e44"/></marker>
+    </defs>
+    <g filter="url(#rough8)">
+      <rect x="20" y="30" width="150" height="60" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <rect x="280" y="30" width="200" height="60" rx="12" fill="#dcf2e2" stroke="#232323" stroke-width="2"/>
+      <rect x="590" y="30" width="150" height="60" rx="12" fill="#ffe8d6" stroke="#232323" stroke-width="2"/>
+      <rect x="280" y="170" width="200" height="60" rx="12" fill="#e5dbfb" stroke="#232323" stroke-width="2"/>
+      <rect x="590" y="170" width="150" height="60" rx="12" fill="#dbeafe" stroke="#232323" stroke-width="2"/>
+      <line x1="170" y1="60" x2="278" y2="60" stroke="#232323" stroke-width="2" marker-end="url(#arrow8)"/>
+      <line x1="480" y1="60" x2="588" y2="60" stroke="#232323" stroke-width="2" marker-end="url(#arrow8)"/>
+      <line x1="380" y1="90" x2="380" y2="168" stroke="#2f9e44" stroke-width="2" marker-end="url(#arrow8g)"/>
+      <line x1="480" y1="200" x2="588" y2="200" stroke="#2f9e44" stroke-width="2" marker-end="url(#arrow8g)"/>
+    </g>
+    <g font-size="15">
+      <text x="95" y="58" text-anchor="middle" class="svg-label">player</text>
+      <text x="95" y="78" text-anchor="middle" class="svg-small" font-size="12">submits a score</text>
+      <text x="380" y="58" text-anchor="middle" class="svg-label">leaderboard API</text>
+      <text x="380" y="78" text-anchor="middle" class="svg-small" font-size="12">POST /boards/1/scores</text>
+      <text x="665" y="58" text-anchor="middle" class="svg-label">the store</text>
+      <text x="665" y="78" text-anchor="middle" class="svg-small" font-size="12">ZADD board:1 120 sam</text>
+      <text x="380" y="198" text-anchor="middle" class="svg-label">publish event</text>
+      <text x="380" y="218" text-anchor="middle" class="svg-small" font-size="12">board:1 — sam moved up</text>
+      <text x="665" y="198" text-anchor="middle" class="svg-label">dashboards</text>
+      <text x="665" y="218" text-anchor="middle" class="svg-small" font-size="12">WebSocket push → re-render</text>
+      <text x="380" y="270" text-anchor="middle" class="svg-small" font-size="13">keys: board:1:scores (sorted set) · board:1:meta (hash) · board:1:events (channel)</text>
+    </g>
+  </svg>
+  <p class="caption">Submit a score → it lands in a sorted set → an event fans out → every open dashboard updates live.</p>
+  </div>
+  <p>Seasons work the same way: a board is just a key, and a key can expire. When a season ends, the old board's key gets a TTL and a new season starts under a fresh key. No cleanup code — expiry does it.</p>
+</section>
+
+<section id="commands">
+  <h2><span class="num">9</span> The full command map</h2>
+  <p class="lede">Everything the finished system does. Each row maps to a queued task — nothing here is aspirational.</p>
+  <table>
+    <tr><th>Group</th><th>Commands</th><th>What for</th><th>Task</th></tr>
+    <tr><td>Connection</td><td><code>PING</code> <code>ECHO</code></td><td>Health checks</td><td>001</td></tr>
+    <tr><td>Strings</td><td><code>SET</code> <code>GET</code> <code>DEL</code> <code>EXISTS</code> <code>INCR</code> <code>DECR</code> <code>APPEND</code></td><td>Plain values, counters</td><td>001–002</td></tr>
+    <tr><td>Hashes</td><td><code>HSET</code> <code>HGET</code> <code>HGETALL</code> <code>HDEL</code></td><td>Profiles, board metadata</td><td>002</td></tr>
+    <tr><td>Sorted sets</td><td><code>ZADD</code> <code>ZRANGE</code> <code>ZREVRANGE</code> <code>ZRANK</code> <code>ZREVRANK</code> <code>ZSCORE</code> <code>ZREM</code> <code>ZCARD</code></td><td>The leaderboard engine</td><td>003</td></tr>
+    <tr><td>TTL</td><td><code>EXPIRE</code> <code>PEXPIRE</code> <code>TTL</code> <code>PTTL</code> <code>PERSIST</code></td><td>Deadlines, seasons</td><td>004</td></tr>
+    <tr><td>Pub/sub</td><td><code>SUBSCRIBE</code> <code>PUBLISH</code> <code>UNSUBSCRIBE</code></td><td>Live updates</td><td>005</td></tr>
+    <tr><td>Persistence</td><td><code>BGSAVE</code> <code>FLUSHALL</code></td><td>Snapshots, reset</td><td>007 / 001</td></tr>
+    <tr><td>Leaderboard API</td><td><code>POST /scores</code> · <code>GET /top</code> · <code>GET /rank/:player</code> · <code>WS /live</code> · <code>POST /season</code></td><td>The product</td><td>008–009</td></tr>
+  </table>
+</section>
+
+<section id="rust">
+  <h2><span class="num">10</span> Rust primer — just enough for kvault</h2>
+  <p class="lede">You've never used Rust. These seven ideas are all you need to read this codebase. Full version in the repo: <code>docs/rust-primer.md</code>.</p>
+  <div class="cards">
+    <div class="card"><h3>1. Ownership &amp; borrowing</h3><p>Every value has one owner; when the owner goes away, the value is freed. You can borrow references, but the compiler enforces: many readers <em>or</em> one writer, never both.</p><p class="where">Where: everywhere. Most compile errors are this rule, and they're usually right.</p></div>
+    <div class="card"><h3>2. Option &amp; Result</h3><p>No null, no exceptions. <code>Option</code> is Some/None (a value that might be absent). <code>Result</code> is Ok/Err. <code>?</code> propagates errors up. The compiler makes you handle both cases.</p><p class="where">Where: <code>GET</code> on a missing key → <code>None</code>; I/O → <code>Result</code>.</p></div>
+    <div class="card"><h3>3. Structs, enums, match</h3><p>Enums can carry data — the store's <code>Value</code> is String, Hash, or SortedSet. <code>match</code> forces you to handle every variant, so adding a type breaks the build until all handlers are updated.</p><p class="where">Where: <code>kv-core</code>'s value types, the RESP parser.</p></div>
+    <div class="card"><h3>4. Traits</h3><p>A trait is a set of methods a type promises — like an interface. Rust's polymorphism without inheritance.</p><p class="where">Where: shared behavior, e.g. a persistence-backend trait.</p></div>
+    <div class="card"><h3>5. Arc &amp; Mutex</h3><p><code>Arc</code>: many owners of the same data. <code>Mutex</code>: a lock — one thread inside at a time, and the compiler enforces it. Together: shared mutable state, safely.</p><p class="where">Where: pub/sub registry, metrics. Not the hot path (§5).</p></div>
+    <div class="card"><h3>6. async / await &amp; Tokio</h3><p>Tasks that pause while waiting instead of blocking a thread. One thread juggles thousands of connections because most are idle. <code>.await</code> is where a task can pause.</p><p class="where">Where: one task per connection in <code>kv-server</code>.</p></div>
+    <div class="card"><h3>7. Modules, crates, Cargo</h3><p>A crate is a library or binary; a workspace groups crates. <code>Cargo.toml</code> declares dependencies. Everything is private unless marked <code>pub</code>.</p><p class="where">Where: three crates, one workspace, one <code>cargo build</code>.</p></div>
+    <div class="card"><h3>Reading Rust</h3><p><code>::</code> separates paths. <code>!</code> means a macro (<code>println!</code>). <code>&amp;</code> borrows. <code>///</code> comments document public items — read those first.</p><p class="where">Where: every file. When stuck, read the error — Rust's are famously helpful.</p></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <h2><span class="num">11</span> Open decisions — yours to weigh in on</h2>
+  <p class="lede">These are judgment calls, not foregone conclusions. Each gets an ADR when its task starts.</p>
+  <table>
+    <tr><th>Decision</th><th>Default</th><th>The alternative</th></tr>
+    <tr><td>Concurrency model</td><td>Single-threaded event loop (like Redis)</td><td>Sharded stores, one loop per shard</td></tr>
+    <tr><td>AOF fsync policy</td><td>Every second (Redis default)</td><td>Every write (safest, slowest)</td></tr>
+    <tr><td>Snapshot format</td><td>Custom binary (more educational)</td><td>A crate like bincode (less code)</td></tr>
+    <tr><td>Leaderboard transport</td><td>In-process <code>kv-core</code> first</td><td>RESP to <code>kv-server</code> later</td></tr>
+    <tr><td>Eviction</td><td>None — unbounded for now</td><td>A maxmemory policy later</td></tr>
+    <tr><td>Key encoding</td><td>Raw bytes (like Redis)</td><td>UTF-8 strings only (simpler)</td></tr>
+  </table>
+</section>
+
+<section id="glossary">
+  <h2><span class="num">12</span> Glossary</h2>
+  <table>
+    <tr><th>Term</th><th>Plain meaning</th></tr>
+    <tr><td>RESP</td><td>Redis's wire protocol — the byte format clients and servers speak. Five types: simple strings, errors, integers, bulk strings, arrays.</td></tr>
+    <tr><td>Event loop</td><td>One thread that waits for I/O events and handles them one at a time. No thread per connection — that's how one thread serves thousands of clients.</td></tr>
+    <tr><td>Full-duplex</td><td>Both directions of a connection usable at the same time (§6).</td></tr>
+    <tr><td>Mutex</td><td>A lock: one thread at a time touches the data (§5).</td></tr>
+    <tr><td>Arc</td><td>A shared pointer; many threads can own the same data, freed when the last owner drops it.</td></tr>
+    <tr><td>Skip list</td><td>A layered linked list with O(log n) insert, lookup, and rank (§4).</td></tr>
+    <tr><td>AOF</td><td>Append-only log of write commands, replayed on startup (§7).</td></tr>
+    <tr><td>Pipelining</td><td>A client sending many commands without waiting for replies.</td></tr>
+    <tr><td>p50 / p99</td><td>The latency 50% / 99% of requests beat. p99 is the "how slow does it feel when it's slow" number.</td></tr>
+    <tr><td>Shard</td><td>A slice of the data, owned by one loop/thread. Sharding splits work across cores.</td></tr>
+  </table>
+</section>
+
+</main>
+<footer>kvault · system design v1 · the written version lives in docs/system-design.md — update both when the design changes</footer>
+</body>
+</html>
